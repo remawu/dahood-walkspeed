@@ -1,0 +1,170 @@
+local UserInputService = game:GetService("UserInputService")
+
+local function isMobile()
+    return UserInputService.TouchEnabled or
+           UserInputService:GetPlatform() == Enum.Platform.IOS or
+           UserInputService:GetPlatform() == Enum.Platform.Android
+end
+
+if isMobile() then
+    local Config = {
+        TargetSpeed = 250,
+        ButtonTextOn = "ON",
+        ButtonTextOff = "OFF",
+        ButtonColorOn = Color3.fromRGB(0, 170, 255),
+        ButtonColorOff = Color3.fromRGB(255, 255, 255),
+        ButtonSize = 60,
+        ButtonPosition = UDim2.new(0.75, 0, 0.7, 0),
+    }
+
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local CoreGui = game:GetService("CoreGui")
+
+    local LocalPlayer = Players.LocalPlayer
+    local speedEnabled = false
+    local currentHumanoid = nil
+
+    local function applySpeed()
+        if not currentHumanoid then return end
+        if speedEnabled and currentHumanoid.WalkSpeed ~= Config.TargetSpeed then
+            currentHumanoid.WalkSpeed = Config.TargetSpeed
+        end
+    end
+
+    local function hookHumanoid(hum)
+        currentHumanoid = hum
+        if speedEnabled then applySpeed() end
+        hum:GetPropertyChangedSignal("WalkSpeed"):Connect(applySpeed)
+    end
+
+    local function onCharacterAdded(character)
+        local hum = character:WaitForChild("Humanoid", 5)
+        if hum then hookHumanoid(hum) end
+    end
+
+    if LocalPlayer.Character then onCharacterAdded(LocalPlayer.Character) end
+    LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+    RunService.RenderStepped:Connect(applySpeed)
+
+    local function CreateToggleButton()
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "WalkSpeedToggle"
+        screenGui.Parent = CoreGui
+        screenGui.ResetOnSpawn = false
+        screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+        local button = Instance.new("TextButton")
+        button.Size = UDim2.new(0, Config.ButtonSize, 0, Config.ButtonSize)
+        button.Position = Config.ButtonPosition
+        button.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        button.BackgroundTransparency = 0.5
+        button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        button.Font = Enum.Font.GothamBold
+        button.TextSize = 14
+        button.Text = Config.ButtonTextOff
+        button.BorderSizePixel = 0
+        button.AutoButtonColor = false
+        button.Parent = screenGui
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(1, 0)
+        corner.Parent = button
+
+        local stroke = Instance.new("UIStroke")
+        stroke.Thickness = 3
+        stroke.Color = Config.ButtonColorOff
+        stroke.Transparency = 0
+        stroke.Parent = button
+
+        local function toggle()
+            speedEnabled = not speedEnabled
+            if speedEnabled then
+                if currentHumanoid then
+                    currentHumanoid.WalkSpeed = Config.TargetSpeed
+                end
+                button.Text = Config.ButtonTextOn
+                stroke.Color = Config.ButtonColorOn
+            else
+                button.Text = Config.ButtonTextOff
+                stroke.Color = Config.ButtonColorOff
+            end
+        end
+
+        local dragStart, startPos, moved
+        button.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragStart = input.Position
+                startPos = button.Position
+                moved = false
+            end
+        end)
+        button.InputChanged:Connect(function(input)
+            if dragStart and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                if delta.Magnitude > 3 then moved = true end
+                button.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
+        button.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                if not moved then toggle() end
+                dragStart = nil
+                startPos = nil
+            end
+        end)
+        button.MouseButton2Click:Connect(toggle)
+    end
+
+    CreateToggleButton()
+
+else
+    local Config = {
+        TargetSpeed = 250,
+        Keybind = "V",
+        Enabled = false,
+    }
+
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local UserInputService = game:GetService("UserInputService")
+
+    local LocalPlayer = Players.LocalPlayer
+    local speedEnabled = Config.Enabled
+    local currentHumanoid = nil
+
+    local function applySpeed()
+        if not currentHumanoid then return end
+        if speedEnabled and currentHumanoid.WalkSpeed ~= Config.TargetSpeed then
+            currentHumanoid.WalkSpeed = Config.TargetSpeed
+        end
+    end
+
+    local function hookHumanoid(hum)
+        currentHumanoid = hum
+        if speedEnabled then applySpeed() end
+        hum:GetPropertyChangedSignal("WalkSpeed"):Connect(applySpeed)
+    end
+
+    local function onCharacterAdded(character)
+        local hum = character:WaitForChild("Humanoid", 5)
+        if hum then hookHumanoid(hum) end
+    end
+
+    if LocalPlayer.Character then onCharacterAdded(LocalPlayer.Character) end
+    LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+    RunService.RenderStepped:Connect(applySpeed)
+
+    local toggleKey = Enum.KeyCode[Config.Keybind:upper()]
+    if toggleKey then
+        UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if input.KeyCode == toggleKey then
+                speedEnabled = not speedEnabled
+                if speedEnabled then
+                    applySpeed()
+                end
+            end
+        end)
+    end
+end
