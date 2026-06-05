@@ -1,0 +1,164 @@
+local uis = game:GetService("UserInputService")
+
+local function isMobile()
+    return uis.TouchEnabled or uis:GetPlatform() == Enum.Platform.IOS or uis:GetPlatform() == Enum.Platform.Android
+end
+
+if isMobile() then
+    local cfg = {
+        TargetSpeed = 250,
+        ButtonTextOn = "ON",
+        ButtonTextOff = "OFF",
+        ButtonColorOn = Color3.fromRGB(0, 170, 255),
+        ButtonColorOff = Color3.fromRGB(255, 255, 255),
+        ButtonSize = 60,
+        ButtonPosition = UDim2.new(0.75, 0, 0.7, 0),
+    }
+
+    local plrs = game:GetService("Players")
+    local rs = game:GetService("RunService")
+    local cg = game:GetService("CoreGui")
+
+    local lp = plrs.LocalPlayer
+    local enabled = false
+    local hum = nil
+
+    local function apply()
+        if not hum then return end
+        if enabled and hum.WalkSpeed ~= cfg.TargetSpeed then
+            hum.WalkSpeed = cfg.TargetSpeed
+        end
+    end
+
+    local function hook(h)
+        hum = h
+        if enabled then apply() end
+        h:GetPropertyChangedSignal("WalkSpeed"):Connect(apply)
+    end
+
+    local function onChar(char)
+        local h = char:WaitForChild("Humanoid", 5)
+        if h then hook(h) end
+    end
+
+    if lp.Character then onChar(lp.Character) end
+    lp.CharacterAdded:Connect(onChar)
+    rs.RenderStepped:Connect(apply)
+
+    local function makeBtn()
+        local gui = Instance.new("ScreenGui")
+        gui.Name = "WalkSpeedToggle"
+        gui.Parent = cg
+        gui.ResetOnSpawn = false
+        gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, cfg.ButtonSize, 0, cfg.ButtonSize)
+        btn.Position = cfg.ButtonPosition
+        btn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        btn.BackgroundTransparency = 0.5
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 14
+        btn.Text = cfg.ButtonTextOff
+        btn.BorderSizePixel = 0
+        btn.AutoButtonColor = false
+        btn.Parent = gui
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(1, 0)
+        corner.Parent = btn
+
+        local stroke = Instance.new("UIStroke")
+        stroke.Thickness = 3
+        stroke.Color = cfg.ButtonColorOff
+        stroke.Transparency = 0
+        stroke.Parent = btn
+
+        local function toggle()
+            enabled = not enabled
+            if enabled then
+                if hum then hum.WalkSpeed = cfg.TargetSpeed end
+                btn.Text = cfg.ButtonTextOn
+                stroke.Color = cfg.ButtonColorOn
+            else
+                btn.Text = cfg.ButtonTextOff
+                stroke.Color = cfg.ButtonColorOff
+            end
+        end
+
+        local dragStart, startPos, moved
+        btn.InputBegan:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+                dragStart = inp.Position
+                startPos = btn.Position
+                moved = false
+            end
+        end)
+        btn.InputChanged:Connect(function(inp)
+            if dragStart and (inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch) then
+                local delta = inp.Position - dragStart
+                if delta.Magnitude > 3 then moved = true end
+                btn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
+        btn.InputEnded:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+                if not moved then toggle() end
+                dragStart = nil
+                startPos = nil
+            end
+        end)
+        btn.MouseButton2Click:Connect(toggle)
+    end
+
+    makeBtn()
+
+else
+    local cfg = {
+        TargetSpeed = 250,
+        Keybind = "V",
+        Enabled = false,
+    }
+
+    local plrs = game:GetService("Players")
+    local rs = game:GetService("RunService")
+    local uis = game:GetService("UserInputService")
+
+    local lp = plrs.LocalPlayer
+    local enabled = cfg.Enabled
+    local hum = nil
+
+    local function apply()
+        if not hum then return end
+        if enabled and hum.WalkSpeed ~= cfg.TargetSpeed then
+            hum.WalkSpeed = cfg.TargetSpeed
+        end
+    end
+
+    local function hook(h)
+        hum = h
+        if enabled then apply() end
+        h:GetPropertyChangedSignal("WalkSpeed"):Connect(apply)
+    end
+
+    local function onChar(char)
+        local h = char:WaitForChild("Humanoid", 5)
+        if h then hook(h) end
+    end
+
+    if lp.Character then onChar(lp.Character) end
+    lp.CharacterAdded:Connect(onChar)
+    rs.RenderStepped:Connect(apply)
+
+    local key = Enum.KeyCode[cfg.Keybind:upper()]
+    if key then
+        uis.InputBegan:Connect(function(inp, gp)
+            if gp then return end
+            if inp.KeyCode == key then
+                enabled = not enabled
+                if enabled then apply() end
+            end
+        end)
+    end
+end
